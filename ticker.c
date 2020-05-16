@@ -4,24 +4,29 @@
 #include <string.h>
 #include <json-c/json.h>
 #include <curl/curl.h>
-#include "stocks.h"
+#include "ticker.h"
 
-int main (int argc, char **argv) 
+int main (int argc, char **argv)
 {
-    CURL *ch;                                               /* curl handle */
-    CURLcode rcode;                                         /* curl result code */
-
-    json_object *json;                                      /* json post body */
-    enum json_tokener_error jerr = json_tokener_success;    /* json parse error */
-
-    struct curl_fetch_st curl_fetch;                        /* curl fetch struct */
-    struct curl_fetch_st *cf = &curl_fetch;                 /* pointer to fetch struct */
-    struct curl_slist *headers = NULL;                      /* http headers to send with request */
+    CURL *ch;
+    CURLcode rcode;
+    json_object *json;
+    enum json_tokener_error jerr = json_tokener_success;
+    struct curl_fetch_st curl_fetch;
+    struct curl_fetch_st *cf = &curl_fetch;
+    struct curl_slist *headers = NULL;
 
     /* url to test site */
-    char *url = "https://query1.finance.yahoo.com/v7/finance/quote?lang=en-US&region=US&corsDomain=finance.yahoo.com&fields=shortName,symbol,marketState,regularMarketPrice,regularMarketChange,regularMarketChangePercent,preMarketPrice,preMarketChange,preMarketChangePercent,postMarketPrice,postMarketChange,postMarketChangePercent&symbols=AAPL";
+    char *url = "https://query1.finance.yahoo.com/v7/finance/quote?lang=en-US&region=US&corsDomain=finance.yahoo.com&fields=shortName,symbol,marketState,regularMarketPrice,regularMarketChange,regularMarketChangePercent,preMarketPrice,preMarketChange,preMarketChangePercent,postMarketPrice,postMarketChange,postMarketChangePercent&symbols=";
 
-    /* Add URL */
+    /* Check inputs */
+    if (argc == 1)
+    {
+        fprintf(stderr, "usage: ticker SYMBOL1 (SYMBOL2) ...\n");
+        return 1;
+    }
+
+    /* Add argv to URL */
     int arglen = 0;
     for (int i = 1; i < argc; i++)
         arglen += strlen(argv[i]);
@@ -36,10 +41,10 @@ int main (int argc, char **argv)
     }
         
     /* init curl handle */
-    if ((ch = curl_easy_init()) == NULL) 
+    if ((ch = curl_easy_init()) == NULL)
     {
         fprintf(stderr, "ERROR: Failed to create curl handle in fetch_session");
-        return 1;
+        return 2;
     }
 
     /* set content type */
@@ -49,55 +54,40 @@ int main (int argc, char **argv)
     /* fetch page and capture return code */
     rcode = curl_fetch_url(ch, fullurl, cf);
 
-    /* cleanup curl handle */
+    /* cleanup curl */
     curl_easy_cleanup(ch);
-
-    /* free headers */
     curl_slist_free_all(headers);
-
-    /* free json object */
-    json_object_put(json);
 
     /* check return code */
     if (rcode != CURLE_OK || cf->size < 1) 
     {
         fprintf(stderr, "ERROR: Failed to fetch url (%s) - curl said: %s",
             url, curl_easy_strerror(rcode));
-        /* return error */
-        return 2;
+        return 3;
     }
 
     /* check payload */
     if (cf->payload != NULL) 
     {
-        /* parse return */
         json = json_tokener_parse_verbose(cf->payload, &jerr);
-        /* free payload */
         free(cf->payload);
     } 
     else 
     {
-        /* error */
         fprintf(stderr, "ERROR: Failed to populate payload");
-        /* free payload */
         free(cf->payload);
-        /* return */
-        return 3;
+        return 4;
     }
 
     /* check error */
     if (jerr != json_tokener_success) 
     {
-        /* error */
         fprintf(stderr, "ERROR: Failed to parse json string");
-        /* free json object */
         json_object_put(json);
-        /* return */
-        return 4;
+        return 5;
     }
-
-    /* debugging */
-    /*printf("Parsed JSON: %s\n", json_object_to_json_string(json));*/
+    
+    /* Print and clean */
     print_stocks(json);
     json_object_put(json);
     free(fullurl);
@@ -109,7 +99,6 @@ void print_stocks(json_object * jobj)
 {
     int len;
     json_object * jsub;
-
     jsub = json_object_object_get(jobj, "quoteResponse"); 
     jsub = json_object_object_get(jsub, "result");
     len = json_object_array_length(jsub);
@@ -176,7 +165,7 @@ void print_stock(json_object *jobj)
     return;
 }
 
-size_t curl_callback (void *contents, size_t size, size_t nmemb, void *userp) 
+size_t curl_callback (void *contents, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;
     struct curl_fetch_st *p = (struct curl_fetch_st *) userp;
@@ -235,7 +224,7 @@ CURLcode curl_fetch_url(CURL *ch, const char *url, struct curl_fetch_st *fetch)
     curl_easy_setopt(ch, CURLOPT_USERAGENT, "libcurl-agent/1.0");
 
     /* set timeout */
-    curl_easy_setopt(ch, CURLOPT_TIMEOUT, 50);
+    curl_easy_setopt(ch, CURLOPT_TIMEOUT, 5);
 
     /* enable location redirects */
     curl_easy_setopt(ch, CURLOPT_FOLLOWLOCATION, 1);
