@@ -19,8 +19,22 @@ int main (int argc, char **argv)
     struct curl_slist *headers = NULL;                      /* http headers to send with request */
 
     /* url to test site */
-    char *url = "https://query1.finance.yahoo.com/v7/finance/quote?lang=en-US&region=US&corsDomain=finance.yahoo.com&fields=shortName,symbol,marketState,regularMarketPrice,regularMarketChange,regularMarketChangePercent,preMarketPrice,preMarketChange,preMarketChangePercent,postMarketPrice,postMarketChange,postMarketChangePercent&symbols=AAPL,GOOG,BTCUSD=X";
+    char *url = "https://query1.finance.yahoo.com/v7/finance/quote?lang=en-US&region=US&corsDomain=finance.yahoo.com&fields=shortName,symbol,marketState,regularMarketPrice,regularMarketChange,regularMarketChangePercent,preMarketPrice,preMarketChange,preMarketChangePercent,postMarketPrice,postMarketChange,postMarketChangePercent&symbols=AAPL";
 
+    /* Add URL */
+    int arglen = 0;
+    for (int i = 1; i < argc; i++)
+        arglen += strlen(argv[i]);
+
+    char * fullurl = malloc(sizeof(char) * (arglen + strlen(url) + argc));
+    strcpy(fullurl, url);
+    strcat(fullurl, argv[1]);
+    for (int i = 2; i < argc; i++)
+    {
+        strcat(fullurl, ",");
+        strcat(fullurl, argv[i]);
+    }
+        
     /* init curl handle */
     if ((ch = curl_easy_init()) == NULL) 
     {
@@ -33,7 +47,7 @@ int main (int argc, char **argv)
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     /* fetch page and capture return code */
-    rcode = curl_fetch_url(ch, url, cf);
+    rcode = curl_fetch_url(ch, fullurl, cf);
 
     /* cleanup curl handle */
     curl_easy_cleanup(ch);
@@ -56,8 +70,6 @@ int main (int argc, char **argv)
     /* check payload */
     if (cf->payload != NULL) 
     {
-        /* print result */
-        printf("CURL Returned: \n%s\n", cf->payload);
         /* parse return */
         json = json_tokener_parse_verbose(cf->payload, &jerr);
         /* free payload */
@@ -88,6 +100,7 @@ int main (int argc, char **argv)
     /*printf("Parsed JSON: %s\n", json_object_to_json_string(json));*/
     print_stocks(json);
     json_object_put(json);
+    free(fullurl);
 
     return 0;
 };
@@ -157,7 +170,7 @@ void print_stock(json_object *jobj)
         strcpy(color, COLOR_GREEN);
 
     printf("%-10s%s%8.2f%s", symbol, COLOR_BOLD, price, COLOR_RESET);
-    printf("%s%10.2f%12.2lf%s", color, diff, percent, COLOR_RESET);
+    printf("%s%10.2f%12.2lf%% %s", color, diff, percent, COLOR_RESET);
     printf("%s\n", msign);
 
     return;
