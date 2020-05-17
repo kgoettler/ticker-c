@@ -16,9 +16,6 @@ int main (int argc, char **argv)
     struct curl_fetch_st *cf = &curl_fetch;
     struct curl_slist *headers = NULL;
 
-    /* url to test site */
-    char *url = "https://query1.finance.yahoo.com/v7/finance/quote?lang=en-US&region=US&corsDomain=finance.yahoo.com&fields=shortName,symbol,marketState,regularMarketPrice,regularMarketChange,regularMarketChangePercent,preMarketPrice,preMarketChange,preMarketChangePercent,postMarketPrice,postMarketChange,postMarketChangePercent&symbols=";
-
     /* Check inputs */
     if (argc == 1)
     {
@@ -26,19 +23,7 @@ int main (int argc, char **argv)
         return 1;
     }
 
-    /* Add argv to URL */
-    int arglen = 0;
-    for (int i = 1; i < argc; i++)
-        arglen += strlen(argv[i]);
-
-    char * fullurl = malloc(sizeof(char) * (arglen + strlen(url) + argc));
-    strcpy(fullurl, url);
-    strcat(fullurl, argv[1]);
-    for (int i = 2; i < argc; i++)
-    {
-        strcat(fullurl, ",");
-        strcat(fullurl, argv[i]);
-    }
+    char * full_url = build_full_url(BASE_URL, argc, argv);
         
     /* init curl handle */
     if ((ch = curl_easy_init()) == NULL)
@@ -52,7 +37,7 @@ int main (int argc, char **argv)
     headers = curl_slist_append(headers, "Content-Type: application/json");
 
     /* fetch page and capture return code */
-    rcode = curl_fetch_url(ch, fullurl, cf);
+    rcode = curl_fetch_url(ch, full_url, cf);
 
     /* cleanup curl */
     curl_easy_cleanup(ch);
@@ -61,8 +46,8 @@ int main (int argc, char **argv)
     /* check return code */
     if (rcode != CURLE_OK || cf->size < 1) 
     {
-        fprintf(stderr, "ERROR: Failed to fetch url (%s) - curl said: %s",
-            url, curl_easy_strerror(rcode));
+        fprintf(stderr, "ERROR: Failed to fetch url - curl said: %s",
+            full_url, curl_easy_strerror(rcode));
         return 3;
     }
 
@@ -88,14 +73,34 @@ int main (int argc, char **argv)
     }
     
     /* Print and clean */
-    print_stocks(json);
+    print_all_stocks(json);
     json_object_put(json);
-    free(fullurl);
+    free(full_url);
 
     return 0;
 };
 
-void print_stocks(json_object * jobj)
+char * build_full_url(const char * url, int nsymbols, char **symbols)
+{
+    /* Add argv to URL */
+    int arglen = 0;
+    for (int i = 1; i < nsymbols; i++)
+        arglen += strlen(symbols[i]);
+
+    char * fullurl = malloc(sizeof(char) * (arglen + strlen(url) + nsymbols));
+    strcpy(fullurl, url);
+    strcat(fullurl, symbols[1]);
+    for (int i = 2; i < nsymbols; i++)
+    {
+        strcat(fullurl, ",");
+        strcat(fullurl, symbols[i]);
+    }
+
+    return fullurl;
+}
+
+
+void print_all_stocks(json_object * jobj)
 {
     int len;
     json_object * jsub;
