@@ -47,7 +47,7 @@ int main (int argc, char **argv)
     if (rcode != CURLE_OK || cf->size < 1) 
     {
         fprintf(stderr, "ERROR: Failed to fetch url - curl said: %s",
-            full_url, curl_easy_strerror(rcode));
+            curl_easy_strerror(rcode));
         return 3;
     }
 
