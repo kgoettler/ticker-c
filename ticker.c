@@ -8,13 +8,9 @@
 
 int main (int argc, char **argv)
 {
-    CURL *ch;
-    CURLcode rcode;
     json_object *json;
-    enum json_tokener_error jerr = json_tokener_success;
-    struct curl_fetch_st curl_fetch;
-    struct curl_fetch_st *cf = &curl_fetch;
-    struct curl_slist *headers = NULL;
+    json_object **pjson = &json;
+    int res;
 
     /* Check inputs */
     if (argc == 1)
@@ -23,55 +19,10 @@ int main (int argc, char **argv)
         return 1;
     }
 
-    char * full_url = build_full_url(BASE_URL, argc, argv);
-        
-    /* init curl handle */
-    if ((ch = curl_easy_init()) == NULL)
-    {
-        fprintf(stderr, "ERROR: Failed to create curl handle in fetch_session");
-        return 2;
-    }
-
-    /* set content type */
-    headers = curl_slist_append(headers, "Accept: application/json");
-    headers = curl_slist_append(headers, "Content-Type: application/json");
-
-    /* fetch page and capture return code */
-    rcode = curl_fetch_url(ch, full_url, cf);
-
-    /* cleanup curl */
-    curl_easy_cleanup(ch);
-    curl_slist_free_all(headers);
-
-    /* check return code */
-    if (rcode != CURLE_OK || cf->size < 1) 
-    {
-        fprintf(stderr, "ERROR: Failed to fetch url - curl said: %s",
-            curl_easy_strerror(rcode));
-        return 3;
-    }
-
-    /* check payload */
-    if (cf->payload != NULL) 
-    {
-        json = json_tokener_parse_verbose(cf->payload, &jerr);
-        free(cf->payload);
-    } 
-    else 
-    {
-        fprintf(stderr, "ERROR: Failed to populate payload");
-        free(cf->payload);
-        return 4;
-    }
-
-    /* check error */
-    if (jerr != json_tokener_success) 
-    {
-        fprintf(stderr, "ERROR: Failed to parse json string");
-        json_object_put(json);
-        return 5;
-    }
+    char *full_url = build_full_url(BASE_URL, argc, argv);
     
+    res = query(full_url, pjson);
+   
     /* Print and clean */
     print_all_stocks(json);
     json_object_put(json);
@@ -80,7 +31,7 @@ int main (int argc, char **argv)
     return 0;
 };
 
-char * build_full_url(const char * url, int nsymbols, char **symbols)
+char *build_full_url(const char *url, int nsymbols, char **symbols)
 {
     /* Add argv to URL */
     int arglen = 0;
@@ -99,8 +50,13 @@ char * build_full_url(const char * url, int nsymbols, char **symbols)
     return fullurl;
 }
 
-
-void print_all_stocks(json_object * jobj)
+/*
+ * Prints all stocks to the terminal. Calls print_stock on all of the
+ * stocks in JSON object.
+ *
+ * @param jobj a json_object returned by the Yahoo Finance API
+ */
+void print_all_stocks(json_object *jobj)
 {
     int len;
     json_object * jsub;
@@ -112,10 +68,15 @@ void print_all_stocks(json_object * jobj)
     return;
 }
 
+/*
+ * Prints a single stock to the terminal.
+ *
+ * @param jobj pointer to a json_object
+ */
 void print_stock(json_object *jobj)
 {
-    const char * mstate, * symbol;
-    char * msign;
+    const char *mstate, *symbol;
+    char *msign;
     char color[12];
     double price, diff, percent, premc, postmc;
     symbol = json_object_get_string(
@@ -170,6 +131,71 @@ void print_stock(json_object *jobj)
     return;
 }
 
+/*
+ * Query the Yahoo Finance API
+ */
+
+int query(char * url, json_object **json)
+{
+    CURL *ch;
+    CURLcode rcode;
+    struct curl_fetch_st curl_fetch;
+    struct curl_fetch_st *cf = &curl_fetch;
+    struct curl_slist *headers = NULL;
+    enum json_tokener_error jerr = json_tokener_success;
+
+    /* init curl handle */
+    if ((ch = curl_easy_init()) == NULL)
+    {
+        fprintf(stderr, "ERROR: Failed to create curl handle in fetch_session");
+        return 2;
+    }
+
+    /* set content type */
+    headers = curl_slist_append(headers, "Accept: application/json");
+    headers = curl_slist_append(headers, "Content-Type: application/json");
+
+    /* fetch page and capture return code */
+    rcode = curl_fetch_url(ch, url, cf);
+
+    /* cleanup curl */
+    curl_easy_cleanup(ch);
+    curl_slist_free_all(headers);
+
+    /* check return code */
+    if (rcode != CURLE_OK || cf->size < 1) 
+    {
+        fprintf(stderr, "ERROR: Failed to fetch url - curl said: %s",
+            curl_easy_strerror(rcode));
+        return 3;
+    }
+
+    /* check payload */
+    if (cf->payload != NULL) 
+    {
+        *json = json_tokener_parse_verbose(cf->payload, &jerr);
+        free(cf->payload);
+    } 
+    else 
+    {
+        fprintf(stderr, "ERROR: Failed to populate payload");
+        free(cf->payload);
+        return 4;
+    }
+
+    /* check error */
+    if (jerr != json_tokener_success) 
+    {
+        fprintf(stderr, "ERROR: Failed to parse json string");
+        json_object_put(*json);
+        return 5;
+    }
+    return 0;
+}
+
+/*
+ * Callback function for cURL call
+ */
 size_t curl_callback (void *contents, size_t size, size_t nmemb, void *userp)
 {
     size_t realsize = size * nmemb;

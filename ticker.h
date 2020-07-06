@@ -12,10 +12,11 @@ struct curl_fetch_st {
     size_t size;
 };
 
-size_t curl_callback (void *contents, size_t size, size_t nmemb, void *userp);
-CURLcode curl_fetch_url(CURL *ch, const char *url, struct curl_fetch_st *fetch);
-char * build_full_url(const char * url, int nsymbols, char **symbols);
+char *build_full_url(const char * url, int nsymbols, char **symbols);
+int query(char * url, json_object ** json);
 void print_all_stocks(json_object * jobj);
 void print_stock(json_object * jobj);
+size_t curl_callback (void *contents, size_t size, size_t nmemb, void *userp);
+CURLcode curl_fetch_url(CURL *ch, const char *url, struct curl_fetch_st *fetch);
 
 #endif
