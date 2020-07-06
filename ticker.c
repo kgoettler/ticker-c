@@ -135,7 +135,7 @@ void print_stock(json_object *jobj)
  * Query the Yahoo Finance API
  */
 
-int query(char * url, json_object **json)
+int query(char *url, json_object **json)
 {
     CURL *ch;
     CURLcode rcode;
